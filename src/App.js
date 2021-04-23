@@ -1,7 +1,7 @@
 import { Component } from "react";
 import "./App.css";
 import HomePage from "./pages/homepage/homepage.components";
-import { Route, Switch } from "react-router-dom";
+import { Redirect, Route, Switch } from "react-router-dom";
 import ShopPage from "./pages/shop/shop.components";
 import Header from "./components/header/header.component";
 import SignInSignUpPage from "./pages/sign-in-sign-up/sign-in-sign-up";
@@ -9,21 +9,21 @@ import {
   auth,
   createUserProfileDocument,
 } from "./components/firebase/firebase.utils";
+import { setCurrentUser } from "./redux/user/user.actions";
+import { connect } from "react-redux";
+import { selectCurrentUser } from "./redux/user/user.selector";
+import { createStructuredSelector } from "reselect";
+import CheckoutPage from "./pages/checkout/checkout.components";
 class App extends Component {
   // const HatsPage = () => <h1>Hats Page</h1>;
-  constructor() {
-    super();
-    this.state = {
-      currentUser: null,
-    };
-  }
+
   unSubscribeFromAuth = null;
   componentDidMount() {
-    this.unSubscribeFromAuth = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        const userRef = await createUserProfileDocument(user);
+    this.unSubscribeFromAuth = auth.onAuthStateChanged(async (userAuth) => {
+      if (userAuth) {
+        const userRef = await createUserProfileDocument(userAuth);
         userRef.onSnapshot((snapShot) => {
-          this.setState({
+          this.props.setCurrentUser({
             currentUser: {
               id: snapShot.id,
               ...snapShot.data(),
@@ -31,7 +31,7 @@ class App extends Component {
           });
         });
       }
-      this.setState({ currentUser: user });
+      this.props.setCurrentUser(userAuth);
     });
   }
 
@@ -43,16 +43,34 @@ class App extends Component {
 
     return (
       <div className="App">
-        <Header currentUser={this.state.currentUser} />
+        <Header />
         <Switch>
           <Route exact path="/" component={HomePage}></Route>
 
           <Route path="/shop" component={ShopPage}></Route>
-          <Route path="/signin" component={SignInSignUpPage}></Route>
+          <Route exact path="/checkout" component={CheckoutPage} />
+          <Route
+            path="/signin"
+            render={() =>
+              this.props.currentUser ? (
+                <Redirect to="/" />
+              ) : (
+                <SignInSignUpPage />
+              )
+            }
+          ></Route>
         </Switch>
       </div>
     );
   }
 }
 
-export default App;
+const mapStateToProps = createStructuredSelector({
+  currentUser: selectCurrentUser,
+});
+
+const mapDispatchToProps = (dispatch) => ({
+  setCurrentUser: (user) => dispatch(setCurrentUser(user)),
+});
+
+export default connect(mapStateToProps, mapDispatchToProps)(App);
